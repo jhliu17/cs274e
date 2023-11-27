@@ -5,8 +5,9 @@
 # Q ?= @
 
 CXX := g++
-PYTHON := /vinai/trungnd19/miniconda3/envs/ot-lcd/bin/python
-NVCC := /usr/local/cuda/bin/nvcc
+PYTHON := /home/junhal11/miniconda3/envs/cs274e/bin/python
+NVCC := /usr/local/cuda-11.3/bin/nvcc
+BUILD_FOLDER := lib.linux-x86_64-cpython-310
 
 # PYTHON Header path
 PYTHON_HEADER_DIR := $(shell $(PYTHON) -c 'from distutils.sysconfig import get_python_inc; print(get_python_inc())')
@@ -66,13 +67,13 @@ CXXFLAGS += -MMD -MP
 # Complete build flags.
 COMMON_FLAGS += $(foreach includedir,$(INCLUDE_DIRS),-I$(includedir)) \
 	     -DTORCH_API_INCLUDE_EXTENSION_H -D_GLIBCXX_USE_CXX11_ABI=0
-CXXFLAGS += -pthread -fPIC -fwrapv -std=c++11 $(COMMON_FLAGS) $(WARNINGS)
-NVCCFLAGS += -std=c++11 -ccbin=$(CXX) -Xcompiler -fPIC $(COMMON_FLAGS)
+CXXFLAGS += -pthread -fPIC -fwrapv -std=c++17 $(COMMON_FLAGS) $(WARNINGS)
+NVCCFLAGS += -std=c++17 -ccbin=$(CXX) -Xcompiler -fPIC $(COMMON_FLAGS)
 
 all: $(STATIC_LIB)
 	$(PYTHON) setup.py build
-	@ mv build/lib.linux-x86_64-3.6/StructuralLosses ..
-	@ mv build/lib.linux-x86_64-3.6/*.so ../StructuralLosses/
+	@ mv build/$(BUILD_FOLDER)/StructuralLosses ..
+	@ mv build/$(BUILD_FOLDER)/*.so ../StructuralLosses/
 	@- $(RM) -rf $(OBJ_DIR) build objs
 
 $(OBJ_DIR):
