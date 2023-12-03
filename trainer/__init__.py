@@ -1,1 +1,1 @@
-from .trainer import AETrainer, ClassifierTrainer
+from .trainer import AETrainer, ClassifierTrainer, VAETrainer

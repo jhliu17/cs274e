@@ -1,2 +1,5 @@
 #!/bin/sh
-python reconstruction/reconstruction_test.py --config="reconstruction/config.json" --logdir="logs/" --data_path="dataset/modelnet40_ply_hdf5_2048/"
+export CUDA_VISIBLE_DEVICES=$1
+
+module load cuda/11.3
+python reconstruction/reconstruction_test.py --config="reconstruction/config_vae.json" --logdir="outputs/reconstruction/logs/" --data_path="dataset/shapenet_core55/shapenet57448xyzonly.npz"

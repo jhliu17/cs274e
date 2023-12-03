@@ -1,3 +1,4 @@
+from unittest import result
 import torch
 import torch.nn as nn
 
@@ -45,6 +46,54 @@ class AETrainer:
         optimizer.step()
 
         result_dic["ae"] = ae
+        result_dic["optimizer"] = optimizer
+        return result_dic
+
+
+class VAETrainer:
+    def __init__(self):
+        super().__init__()
+
+    @staticmethod
+    def train(vae, loss_func, optimizer, data, **kwargs):
+        """
+        VARIATIONAL AUTOENCODER TRAINER
+        vae: nn.Module
+            the variational autoencoder with initial weights
+        loss_func: nn.Module
+            Chamfer, EMD, SWD
+        optimizer: nn.optim
+            optimizer, such as, SGD or Adam, with initial state
+        dataloader: torch.utils.data.dataloader
+            dataloader
+        device: "cuda" or "cpu"
+        """
+        vae.train()
+        latent, mean, var = vae.encode(data, return_mu_logvar=True)
+        reconstructed_data = vae.decode(latent)
+
+        if "input" in kwargs.keys():
+            inp = kwargs["input"]
+        else:
+            inp = data
+
+        rec_loss_dic = loss_func.forward(
+            inp, reconstructed_data, latent=latent, **kwargs
+        )
+
+        # negative_elbo_bound
+        result_dic = {}
+        kl = vae.kl_divergence(mean, var)
+        rec = rec_loss_dic["loss"]
+        result_dic["loss"] = kl + rec
+        result_dic["nelbo_kl"] = kl.item()
+        result_dic["nelbo_rec"] = rec.item()
+
+        optimizer.zero_grad()
+        result_dic["loss"].backward()
+        optimizer.step()
+
+        result_dic["ae"] = vae
         result_dic["optimizer"] = optimizer
         return result_dic
 
@@ -135,5 +184,7 @@ class adasw_dynamic_eps_AETrainer:
 
 Trainer.register(AETrainer)
 assert issubclass(AETrainer, Trainer)
+Trainer.register(VAETrainer)
+assert issubclass(VAETrainer, Trainer)
 Trainer.register(ClassifierTrainer)
 assert issubclass(ClassifierTrainer, Trainer)

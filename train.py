@@ -13,14 +13,15 @@ from dataset import ShapeNetCore55XyzOnlyDataset
 from evaluator import Evaluator
 from logger import Logger
 from loss import ASW, EMD, SWD, Chamfer, GenSW, MaxSW
-from models import PointCapsNet, PointNetAE
+from models import PointCapsNet, PointNetAE, PointNetVAE
 from models.utils import init_weights
 from saver import Saver
 from torch.optim import SGD, Adam
 from torch.optim.lr_scheduler import CyclicLR
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-from trainer import AETrainer as Trainer
+from trainer import AETrainer, VAETrainer
+from trainer.interface import Trainer
 from utils import get_lr
 
 
@@ -28,7 +29,7 @@ torch.backends.cudnn.enabled = False
 
 
 def seed_worker(worker_id):
-    worker_seed = torch.initial_seed() % 2 ** 32
+    worker_seed = torch.initial_seed() % 2**32
     np.random.seed(worker_seed)
     random.seed(worker_seed)
 
@@ -38,7 +39,9 @@ def main():
     parser.add_argument("--config", help="path to json config file")
     parser.add_argument("--logdir", help="path to the log directory")
     parser.add_argument("--data_path", help="path to data")
-    parser.add_argument("--loss", default="swd", help="[swd, emd, chamfer, asw, msw, gsw]")
+    parser.add_argument(
+        "--loss", default="swd", help="[swd, emd, chamfer, asw, msw, gsw]"
+    )
     parser.add_argument("--autoencoder", default="pointnet", help="[pointnet, pcn]")
     args = parser.parse_args()
     config = args.config
@@ -95,7 +98,9 @@ def main():
     # NoiseAdder
     if args["add_noise"]:
         if args["noise_adder"] == "random":
-            noise_adder = RandomNoiseAdder(mean=args["mean_noiseadder"], std=args["std_noiseadder"])
+            noise_adder = RandomNoiseAdder(
+                mean=args["mean_noiseadder"], std=args["std_noiseadder"]
+            )
         else:
             raise ValueError("Unknown noise_adder type.")
 
@@ -108,7 +113,14 @@ def main():
             args["num_points"],
             args["normalize"],
         ).to(device)
-
+    elif args["autoencoder"] == "pointnet_vae":
+        autoencoder = PointNetVAE(
+            args["embedding_size"],
+            args["input_channels"],
+            args["input_channels"],
+            args["num_points"],
+            args["normalize"],
+        ).to(device)
     elif args["autoencoder"] == "pcn":
         autoencoder = PointCapsNet(
             args["prim_caps_size"],
@@ -144,17 +156,28 @@ def main():
         dic["degree"] = args["degree"]
 
     elif args["loss"] == "msw":
-        loss_func = MaxSW(device, max_sw_num_iters=args["max_sw_num_iters"], max_sw_lr=args["max_sw_lr"])
+        loss_func = MaxSW(
+            device,
+            max_sw_num_iters=args["max_sw_num_iters"],
+            max_sw_lr=args["max_sw_lr"],
+        )
 
     elif args["loss"] == "gsw":
-        loss_func = GenSW(num_projs=args["num_projs"], g_type=args["g_type"], device=device, degree=args["degree"])
+        loss_func = GenSW(
+            num_projs=args["num_projs"],
+            g_type=args["g_type"],
+            device=device,
+            degree=args["degree"],
+        )
 
     else:
         raise Exception("Unknown loss function.")
 
     # dataset
     if args["train_set"] == "shapenetcore55":
-        dataset = ShapeNetCore55XyzOnlyDataset(data_path, num_points=args["num_points"], phase="train")
+        dataset = ShapeNetCore55XyzOnlyDataset(
+            data_path, num_points=args["num_points"], phase="train"
+        )
 
     else:
         raise Exception("Unknown dataset")
@@ -178,6 +201,12 @@ def main():
 
     else:
         raise Exception("Optimizer has had implementation yet.")
+
+    # init trainer
+    if args["autoencoder"] == "pointnet_vae":
+        Trainer = VAETrainer
+    else:
+        Trainer = AETrainer
 
     # init weights
     if osp.isfile(osp.join(logdir, args["checkpoint"])):
@@ -224,7 +253,9 @@ def main():
     # scheduler
     if args["use_scheduler"]:
         if args["scheduler"] == "cyclic_lr":
-            scheduler = CyclicLR(optimizer, base_lr=args["base_lr"], max_lr=args["max_lr"])
+            scheduler = CyclicLR(
+                optimizer, base_lr=args["base_lr"], max_lr=args["max_lr"]
+            )
         else:
             raise Exception("Unknown learning rate scheduler.")
 
@@ -243,7 +274,9 @@ def main():
     # val_set and val_loader
     if args["have_val_set"]:
         if args["val_set"] == "shapenetcore55":
-            val_set = ShapeNetCore55XyzOnlyDataset(args["val_root"], num_points=args["num_points"], phase="test")
+            val_set = ShapeNetCore55XyzOnlyDataset(
+                args["val_root"], num_points=args["num_points"], phase="test"
+            )
 
         else:
             raise Exception("Unknown dataset")
@@ -334,16 +367,24 @@ def main():
             if "epsilon" in dic.keys():
                 if not args["fix_epsilon"]:
                     # updata prev_losses_list
-                    assert ("num_prev_losses" in args.keys()) and (args["num_prev_losses"] > 0)
+                    assert ("num_prev_losses" in args.keys()) and (
+                        args["num_prev_losses"] > 0
+                    )
                     if len(prev_losses_list) == args["num_prev_losses"]:
                         prev_losses_list.pop(0)  # pop the first item
                     prev_losses_list.append(train_loss.item())  # add item to the last
-                    dic["epsilon"] = min(prev_losses_list) * args["next_epsilon_ratio_rec"]
+                    dic["epsilon"] = (
+                        min(prev_losses_list) * args["next_epsilon_ratio_rec"]
+                    )
 
             if "rec" in dic.keys() and "epsilon" in dic["rec"].keys():
-                dic["rec"]["epsilon"] = result_dic["rec_loss"].item() * args["next_epsilon_ratio_rec"]
+                dic["rec"]["epsilon"] = (
+                    result_dic["rec_loss"].item() * args["next_epsilon_ratio_rec"]
+                )
             if "reg" in dic.keys() and "epsilon" in dic["reg"].keys():
-                dic["reg"]["epsilon"] = result_dic["reg_loss"].item() * args["next_epsilon_ratio_reg"]
+                dic["reg"]["epsilon"] = (
+                    result_dic["reg_loss"].item() * args["next_epsilon_ratio_reg"]
+                )
 
             # adjust scheduler
             if args["use_scheduler"]:
@@ -357,8 +398,14 @@ def main():
                 info["reg_train_loss"] = reg_train_loss_list[-1]
             if "num_slices" in result_dic.keys():
                 info["num_slices"] = result_dic["num_slices"]
+            if "nelbo_kl" in result_dic.keys():
+                info["nelbo_kl"] = result_dic["nelbo_kl"]
+            if "nelbo_rec" in result_dic.keys():
+                info["nelbo_rec"] = result_dic["nelbo_rec"]
             for tag, value in info.items():
-                tensorboard_logger.scalar_summary(tag, value, len(train_loader) * epoch + batch_id + 1)
+                tensorboard_logger.scalar_summary(
+                    tag, value, len(train_loader) * epoch + batch_id + 1
+                )
 
             # empty cache
             if ("empty_cache_batch" in args.keys()) and args["empty_cache_batch"]:
@@ -378,7 +425,9 @@ def main():
             with torch.no_grad():
                 for batch_id, batch in tqdm(enumerate(val_loader)):
                     val_data = batch.to(device)
-                    result_dic = Evaluator.evaluate(autoencoder, val_data, loss_func, **eval_dic)
+                    result_dic = Evaluator.evaluate(
+                        autoencoder, val_data, loss_func, **eval_dic
+                    )
                     eval_value_list.append(result_dic["evaluation"].item())
                 # end for
             avg_eval_value = sum(eval_value_list) / len(eval_value_list)
@@ -389,7 +438,9 @@ def main():
         # save checkpoint
         checkpoint_path = osp.join(logdir, "latest.pth")
         if args["use_scheduler"]:
-            Saver.save_checkpoint(autoencoder, optimizer, checkpoint_path, scheduler=scheduler)
+            Saver.save_checkpoint(
+                autoencoder, optimizer, checkpoint_path, scheduler=scheduler
+            )
         else:
             Saver.save_checkpoint(autoencoder, optimizer, checkpoint_path)
 
@@ -419,7 +470,9 @@ def main():
         # report
         train_log = "Epoch {}| train_loss : {}\n".format(epoch, avg_train_loss)
         eval_log = "Epoch {}| eval_value : {}\n".format(epoch, avg_eval_value)
-        eval_best_log = "Best epoch {}| best eval value: {}\n".format(best_epoch, best_eval_value)
+        eval_best_log = "Best epoch {}| best eval value: {}\n".format(
+            best_epoch, best_eval_value
+        )
         best_train_loss_log = "Best_train_loss epoch {}| best train loss : {}\n".format(
             best_epoch_based_on_train_loss, best_train_loss
         )
@@ -437,20 +490,26 @@ def main():
         print(best_train_loss_log)
 
         if len(rec_train_loss_list) > 0:
-            rec_train_log = "Epoch {}| rec_train_loss : {}\n".format(epoch, avg_rec_train_loss)
+            rec_train_log = "Epoch {}| rec_train_loss : {}\n".format(
+                epoch, avg_rec_train_loss
+            )
             with open(rec_train_log_path, "a") as fp:
                 fp.write(rec_train_log)
             print(rec_train_log)
 
         if len(reg_train_loss_list) > 0:
-            reg_train_log = "Epoch {}| reg_train_loss : {}\n".format(epoch, avg_reg_train_loss)
+            reg_train_log = "Epoch {}| reg_train_loss : {}\n".format(
+                epoch, avg_reg_train_loss
+            )
             with open(reg_train_log_path, "a") as fp:
                 fp.write(reg_train_log)
             print(reg_train_log)
 
         if ("empty_cache_epoch" in args.keys()) and args["empty_cache_epoch"]:
             torch.cuda.empty_cache()
-        print("---------------------------------------------------------------------------------------")
+        print(
+            "---------------------------------------------------------------------------------------"
+        )
     # end for
 
     finish_time = time.time()

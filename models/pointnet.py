@@ -5,6 +5,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from .utils import gaussian_parameters, kl_normal, sample_gaussian
+
 
 sys.path.append(osp.dirname(osp.dirname(osp.abspath(__file__))))
 
@@ -68,7 +70,14 @@ class PointNetDecoder(nn.Module):
 
 
 class PointNetAE(nn.Module):
-    def __init__(self, embedding_size=256, input_channels=3, output_channels=3, num_points=1024, normalize=True):
+    def __init__(
+        self,
+        embedding_size=256,
+        input_channels=3,
+        output_channels=3,
+        num_points=1024,
+        normalize=True,
+    ):
         super(PointNetAE, self).__init__()
         self.normalize = normalize
         self.input_channels = input_channels
@@ -86,3 +95,66 @@ class PointNetAE(nn.Module):
     def decode(self, z):
         y = self.decoder(z)
         return y
+
+
+class PointNetVAE(nn.Module):
+    def __init__(
+        self,
+        embedding_size=256,
+        input_channels=3,
+        output_channels=3,
+        num_points=1024,
+        normalize=True,
+    ):
+        super().__init__()
+        self.normalize = normalize
+        self.input_channels = input_channels
+        self.output_channels = output_channels
+        self.embedding_size = embedding_size
+        self.encoder = PointNetEncoder(embedding_size, input_channels)
+        self.decoder = PointNetDecoder(embedding_size, output_channels, num_points)
+
+        self.net = nn.Sequential(
+            nn.Linear(embedding_size, embedding_size // 2),
+            nn.ELU(),
+            nn.Linear(embedding_size // 2, 2 * embedding_size),
+        )
+
+        # Set prior as fixed parameter attached to Module
+        self.z_prior_m = nn.Parameter(torch.zeros(1), requires_grad=False)
+        self.z_prior_v = nn.Parameter(torch.ones(1), requires_grad=False)
+        self.z_prior = (self.z_prior_m, self.z_prior_v)
+
+    def encode(self, x, return_mu_logvar=False):
+        z = self.encoder(x)
+        if self.normalize:
+            z = F.normalize(z)
+        h = self.net(z)
+        m, v = gaussian_parameters(h, dim=-1)
+        z = sample_gaussian(m, v)
+
+        if not return_mu_logvar:
+            return z
+        else:
+            return z, m, v
+
+    def decode(self, z):
+        y = self.decoder(z)
+        return y
+
+    def kl_divergence(self, m, v):
+        kl_loss = torch.mean(kl_normal(m, v, torch.zeros_like(m), torch.ones_like(v)))
+        return kl_loss
+
+    def sample_z(self, batch):
+        return sample_gaussian(
+            self.z_prior[0].expand(batch, self.z_dim),
+            self.z_prior[1].expand(batch, self.z_dim),
+        )
+
+    def sample_x(self, batch):
+        z = self.sample_z(batch)
+        return self.sample_x_given(z)
+
+    def sample_x_given(self, z):
+        return self.decode(z)
