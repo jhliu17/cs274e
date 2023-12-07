@@ -10,8 +10,8 @@
     "mean_noiseadder":0.0,
     "std_noiseadder": 1.0, 
 
-    "dataset_type": "modelnet40",
-    "root": "dataset/modelnet40_ply_hdf5_2048/",
+    "dataset_type": "shapenet55",
+    "root": "dataset/shapenet_core55/shapenet57448xyzonly.npz",
     "num_workers": 0,
     "shuffle": false,
     "num_projs": 100,
@@ -23,7 +23,7 @@
     "embedding_size": 256,
     "input_channels": 3,
 
-    "save_folder": "reconstruction/model/modelnet40_pretrained/",
+    "save_folder": "reconstruction/model/shapenet55_pretrained/",
     "bin": 50,
 
     "output_channels": 3,
