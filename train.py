@@ -42,6 +42,9 @@ def main():
     parser.add_argument(
         "--loss", default="swd", help="[swd, emd, chamfer, asw, msw, gsw]"
     )
+    parser.add_argument(
+        "--beta_vae_beta", default=1.0, help="the beta value for beta-vae"
+    )
     parser.add_argument("--autoencoder", default="pointnet", help="[pointnet, pcn]")
     args = parser.parse_args()
     config = args.config
@@ -49,10 +52,12 @@ def main():
     data_path = args.data_path
     loss_type = args.loss
     ae_type = args.autoencoder
+    beta_vae_beta = args.beta_vae_beta
     print("Save checkpoints and logs in: ", logdir)
     args = json.load(open(config))
     args["autoencoder"] = ae_type
     args["loss"] = loss_type
+    args["beta_vae_beta"] = beta_vae_beta
 
     # set seed
     torch.manual_seed(args["seed"])
@@ -120,6 +125,7 @@ def main():
             args["input_channels"],
             args["num_points"],
             args["normalize"],
+            args["beta_vae_beta"],
         ).to(device)
     elif args["autoencoder"] == "pcn":
         autoencoder = PointCapsNet(

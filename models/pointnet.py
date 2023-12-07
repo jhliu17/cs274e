@@ -105,6 +105,7 @@ class PointNetVAE(nn.Module):
         output_channels=3,
         num_points=1024,
         normalize=True,
+        beta=1.0,
     ):
         super().__init__()
         self.normalize = normalize
@@ -113,6 +114,7 @@ class PointNetVAE(nn.Module):
         self.embedding_size = embedding_size
         self.encoder = PointNetEncoder(embedding_size, input_channels)
         self.decoder = PointNetDecoder(embedding_size, output_channels, num_points)
+        self.beta = beta
 
         self.net = nn.Sequential(
             nn.Linear(embedding_size, embedding_size // 2),
@@ -143,7 +145,10 @@ class PointNetVAE(nn.Module):
         return y
 
     def kl_divergence(self, m, v):
-        kl_loss = torch.mean(kl_normal(m, v, torch.zeros_like(m), torch.ones_like(v)))
+        kl_loss = (
+            torch.mean(kl_normal(m, v, torch.zeros_like(m), torch.ones_like(v)))
+            * self.beta
+        )
         return kl_loss
 
     def sample_z(self, batch):
