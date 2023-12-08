@@ -52,7 +52,7 @@ def main():
     data_path = args.data_path
     loss_type = args.loss
     ae_type = args.autoencoder
-    beta_vae_beta = args.beta_vae_beta
+    beta_vae_beta = float(args.beta_vae_beta)
     print("Save checkpoints and logs in: ", logdir)
     args = json.load(open(config))
     args["autoencoder"] = ae_type
@@ -78,8 +78,8 @@ def main():
                 os.makedirs(logdir)
             elif answer == "no":
                 print("SOME FILES WILL BE OVERWRITTEN OR APPENDED.")
-                print("If you do not want this, please stop during next 30s.")
-                time.sleep(30)
+                print("If you do not want this, please stop during next 10s.")
+                time.sleep(10)
             else:
                 print("Please enter 'yes' or 'no'.")
     fname = os.path.join(logdir, "train_ae_config.json")

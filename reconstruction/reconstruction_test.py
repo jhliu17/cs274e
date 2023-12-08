@@ -109,7 +109,7 @@ def main():
         batch_size=1,
         pin_memory=True,
         num_workers=args["num_workers"],
-        shuffle=args["shuffle"],
+        shuffle=False,
         worker_init_fn=seed_worker,
     )
 
