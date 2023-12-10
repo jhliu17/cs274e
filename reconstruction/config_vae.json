@@ -13,7 +13,7 @@
     "num_projs": 100,
     "num_points": 2048,
     "architecture": "pointnet_vae",
-    "model_path": "outputs/vae_logs/model.pth",
+    "model_path": "outputs/vae_chamfer_logs_ep500/epoch_500.pth",
     "embedding_size": 256,
     "input_channels": 3,
     "save_folder": "vae/",

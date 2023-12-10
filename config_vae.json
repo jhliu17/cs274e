@@ -42,7 +42,7 @@
     "val_root": "dataset/shapenet_core55/shapenet57448xyzonly.npz",
     "val_batch_size": 338,
     "optimizer": "sgd",
-    "learning_rate": 0.001,
+    "learning_rate": 0.0001,
     "momentum": 0.9,
     "weight_decay": 0.0005,
     "checkpoint": "latest.pth",
@@ -58,7 +58,7 @@
     "best_epoch_based_on_train_loss": -1,
     "epoch_gap_for_evaluation": 1,
     "start_epoch": 0,
-    "num_epochs": 501,
+    "num_epochs": 1001,
     "epoch_gap_for_save": 50,
     "empty_cache_batch": false,
     "empty_cache_epoch": false

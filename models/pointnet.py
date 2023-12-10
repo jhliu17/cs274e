@@ -153,8 +153,8 @@ class PointNetVAE(nn.Module):
 
     def sample_z(self, batch):
         return sample_gaussian(
-            self.z_prior[0].expand(batch, self.z_dim),
-            self.z_prior[1].expand(batch, self.z_dim),
+            self.z_prior[0].expand(batch, self.embedding_size),
+            self.z_prior[1].expand(batch, self.embedding_size),
         )
 
     def sample_x(self, batch):

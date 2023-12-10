@@ -40,11 +40,19 @@ def main():
         type=str,
         help="path to data",
     )
+    parser.add_argument(
+        "--model_path",
+        default="outputs/vae_chamfer_logs_ep500/epoch_500.pth",
+        type=str,
+        help="path to model",
+    )
     args = parser.parse_args()
     config = args.config
     logdir = args.logdir
     data_path = args.data_path
+    model_path = args.model_path
     args = json.load(open(config))
+    args["model_path"] = model_path
 
     # set seed
     torch.manual_seed(args["seed"])
