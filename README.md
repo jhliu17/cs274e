@@ -1,6 +1,6 @@
 # CS 274E Deep Generative Model Class Project
 
-Project title: **Accurate and Efficient Representation Learning of 3D Point Cloud Data with VAE**
+Project title: **Generative Representation Learning of 3D Point Cloud Data with VAE**
 
 Group members: Thanh-Tung Le, Junhao Liu, Pooya Khosrav
 
